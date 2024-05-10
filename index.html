@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+   <title>K250 Interface</title>
+   <script src="k250.js"></script>
+   <script src="packets.js"></script>
+</head>
+<body onLoad="initPage()">
+<div>K250 Interface</div>
+
+<div id="notAvailable"> 
+    <div>Serial Port Not Available</div>
+    <div>Explanation of requirements, (https, chrome, etc)</div>
+</div>
+
+<div id="mainPanel" style="display: none;">
+    <div>
+        <button id="btnConnect" onclick="condiscon()">Connect</button>
+    </div>
+    <div id="connected" style="display:none;">
+        <div>
+            <button id="btnLinkReset" onclick="doLinkResync()">Link Resync</button>
+        </div>
+        <div>
+            <button id="btnConfig" onclick="doGetConfig()">Get Config</button>
+            <span id="configInfo">.</span>
+        </div>
+        <div id="appMessage"> </div>
+        <div>
+            <button id="btnSaveD1" onclick="doSaveDigitizer()">Save Digitizer</button>
+        </div>
+        <div>
+            <div>
+                Load Digitizer <input type="file" id="k250File"/>
+            </div>
+            <div><progress id="uploadprog" max="100" value="0" style="display: none;">%</progress></div>
+        </div>
+        
+    </div>
+</div>
+
+<div style="padding-top: 2em;">
+    <a href="digitizer.bin">Sample Digitizer File</a>
+</div>
+
+<script>
+    const k250 = new K250Interface();
+    let isDownloading=false;
+    let isSending=false;
+    let fileBuffer=new Uint8Array([]);
+    let fileSize=-1;
+    let fileMetaData = [0,0]; //[filesize, numberofpackets, packetsizes...]
+    let sendPacketNum=0;
+    let sendPacketIndex=0;
+
+    function initPage() {
+        if (k250.isSupported) {
+            document.querySelector("#notAvailable").style.display="none";
+            document.querySelector("#mainPanel").style.display="block";
+            k250.on("appmsg",appMsg);
+            k250.on("errmsg",errMsg);
+            const fileElement = document.querySelector("#k250File");
+            fileElement.onchange = readFile;
+        } 
+    }
+    function condiscon() {
+        if (k250.isConnected) {
+            k250.disconnect();
+        } else {
+            k250.connect();
+        }
+    }
+
+    function doLinkResync() {
+        sleep(800).then(()=>{k250.linkResync()});
+    }
+
+    function doGetConfig() {
+        k250.getConfig();
+    }
+
+    function doSaveDigitizer() {
+        isDownloading=true;
+        fileSize = -1;
+        k250.getFile(); //this will take parameters for different file types
+    }
+
+    function appMsg(event) {
+        //console.log(event.detail);
+        switch (event.detail.type) {
+            case 1: //Connected
+                document.querySelector("#btnConnect").innerHTML="Disconnect";
+                document.querySelector("#connected").style.display="block";
+                break;
+            case 2: //Disconnected
+                document.querySelector("#btnConnect").innerHTML="Connect";
+                document.querySelector("#connected").style.display="none";
+                break;
+            case 3: //packet data
+                if (isDownloading) {
+                    //are we reading file size?
+                    if (fileSize==-1) {
+                         fileSize = new DataView(event.detail.data.buffer).getInt32();
+                         if (fileSize<1) {
+                            document.querySelector("#appMessage").innerHTML="No Data Available";
+                            isDownloading=false;
+                            //do something else??
+                         } else {
+                            //file size OK, prep for data RX
+                            document.querySelector("#appMessage").innerHTML="FileSize: "+fileSize;
+                            fileMetaData=[fileSize,0];
+                            fileBuffer=new Uint8Array([]);
+                            k250.getNextPacket();
+                         }
+                    } else {
+                        // continue reading data, add data to buffer
+                        const r = event.detail.data;
+                        //console.log("data len="+r.length);
+                        addToFileBuffer(r);
+                        if ((fileSize-fileBuffer.length)<512 ) { //why does it end before buffer==filesize??
+                            document.querySelector("#appMessage").innerHTML="FileSize: "+fileSize+" Buffer:"+fileBuffer.length+" done";
+                            // done!
+                            isDownloading=false;
+                            download('digitizer.bin');
+                            doLinkResync();
+                        } else {
+                            document.querySelector("#appMessage").innerHTML="FileSize: "+fileSize+" Buffer:"+fileBuffer.length;
+                            k250.getNextPacket();
+                        }
+                    } 
+                    //end of downloading section
+                } else if (isSending) {
+                    //expecting byte[0,0,0,0]
+                    //prep, then first packet
+                    sendPacketNum=1;
+                    sendPacketIndex=0;
+
+                    document.querySelector("#uploadprog").value=sendPacketNum;
+                    document.querySelector("#uploadprog").max=fileMetaData[1];
+                    document.querySelector("#uploadprog").style.display="block";
+
+                    sendNextFilePacket();
+                    //end of sending section
+                } else {
+                    // not downloading or sending
+                    document.querySelector("#configInfo").innerHTML=k250.bufferToHex(event.detail.data);
+                    doLinkResync();
+                }
+                break;
+            case 4:
+                // a packet was sent, ready for more
+                sendNextFilePacket();
+                break;
+            default: 
+                document.querySelector("#appMessage").innerHTML=event.detail.data;
+        }
+    }
+
+    function sendNextFilePacket() {
+        if (sendPacketNum>fileMetaData[1]) {
+            //done!
+            isSending=false;
+            document.querySelector("#uploadprog").style.display="none";
+            doLinkResync();
+        } else {
+            const xmitBytes = fileMetaData[sendPacketNum+1];
+            let packetData=fileBuffer.buffer.slice(sendPacketIndex,sendPacketIndex+xmitBytes);
+            sendPacketIndex+=xmitBytes;
+            sendPacketNum++;
+            document.querySelector("#uploadprog").value=sendPacketNum;
+            k250.sendData(packetData);
+        }
+    }
+
+    function errMsg(event) {
+        console.error(event.detail);
+        document.querySelector("#btnConnect").innerHTML="Connect";
+        document.querySelector("#appMessage").innerHTML=event.detail.data;
+        k250.disconnect();
+    }
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function addToFileBuffer(bufData) {
+        const buffer = Uint8Array.from(bufData);
+        let merged = new Uint8Array(fileBuffer.length + buffer.length);
+        merged.set(fileBuffer);
+        merged.set(buffer, fileBuffer.length);
+        fileBuffer = merged;
+        fileMetaData[1]++; //add to packet count
+        fileMetaData.push(buffer.length); //add packet length
+    }
+
+    function download(filename)  {
+        //add meta data infront of fileBuffer
+        const fmd32 = new Uint32Array(fileMetaData);
+        const metaDataBytes = new Uint8Array(fmd32.buffer);
+        const metaLength=metaDataBytes.length;
+
+        //make a final byte array with length of metadata, metadata, filedata
+        const metaLengthBytes = new Uint8Array([
+          (metaLength & 0x000000ff),
+          (metaLength & 0x0000ff00) >> 8,
+          (metaLength & 0x00ff0000) >> 16,
+          (metaLength & 0xff000000) >> 24
+        ]);
+        //combine all into one big byte array
+        let wholeFile = new Uint8Array(4+metaLength+fileBuffer.length);
+        wholeFile.set(metaLengthBytes);
+        wholeFile.set(metaDataBytes,4);
+        wholeFile.set(fileBuffer, 4+metaLength);
+
+        //create element and download
+        const a = document.createElement('a');
+        const file = new Blob([wholeFile], {type: 'application/octet-stream'});
+        a.href = URL.createObjectURL(file);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    function readFile(e) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            // e.target points to the reader, e.target.result is ArrayBuffer
+            //1st 4 bytes are length of metadata array
+            let u32bytes = e.target.result.slice(0,4); 
+            let metaSize = new Uint32Array(u32bytes)[0];
+            //next is meta
+            fileMetaData=new Uint32Array(e.target.result.slice(4,4+metaSize));
+            //then the rest is buffer data
+            fileBuffer=new Uint8Array(e.target.result.slice(4+metaSize));
+            //console.log(`The content of ${file.name} is ${textContent}`);
+            isSending=true;
+            k250.startSendFile();
+        }
+        reader.onerror = (e) => {
+            const error = e.target.error;
+            console.error(`Error occured while reading ${file.name}`, error);
+        }
+        //now start the read
+        reader.readAsArrayBuffer(file);
+    }
+</script>
+</body>
+</html>
