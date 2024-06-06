@@ -40,7 +40,10 @@
 </div>
 
 <div style="padding-top: 2em;">
-    <a href="digitizer.bin">Sample Digitizer File</a>
+    <div>QLS Files</div>
+    <a href="qlsfiles/BELLS">BELLS</a> <br/>
+    <a href="qlsfiles/HARMONICA">HARMONICA</a> <br/>
+    <a href="qlsfiles/TomOhYeah">TomOhYeah</a>
 </div>
 
 <script>
@@ -220,6 +223,12 @@
         URL.revokeObjectURL(a.href);
     }
 
+    function addToFileMD(amount) {
+        fileMetaData[0]+=amount;
+        fileMetaData[1]++;
+        fileMetaData.push(amount);
+    }
+
     function readFile(e) {
         const file = event.target.files[0];
         if (!file) return;
@@ -227,16 +236,49 @@
         const reader = new FileReader();
         reader.onload = (e) => {
             // e.target points to the reader, e.target.result is ArrayBuffer
-            //1st 4 bytes are length of metadata array
-            let u32bytes = e.target.result.slice(0,4); 
-            let metaSize = new Uint32Array(u32bytes)[0];
-            //next is meta
-            fileMetaData=new Uint32Array(e.target.result.slice(4,4+metaSize));
-            //then the rest is buffer data
-            fileBuffer=new Uint8Array(e.target.result.slice(4+metaSize));
-            //console.log(`The content of ${file.name} is ${textContent}`);
-            isSending=true;
-            k250.startSendFile();
+            let inputFileBytes = new Uint8Array(e.target.result.slice(0));
+            if (inputFileBytes[0]==0 && inputFileBytes[1]==7) {
+                console.log("Digitizer File Detected");
+                fileBuffer=new Uint8Array(inputFileBytes.length-218);
+                fileBuffer.set(inputFileBytes.slice(0,22310))
+                fileBuffer.set(inputFileBytes.slice(22528),22310)
+                fileMetaData=[0,0];
+
+                addToFileMD(512);
+                addToFileMD(10);
+                for (let i=0;i<42;i++) {
+                    addToFileMD(512);
+                }
+                addToFileMD(284);
+                addToFileMD(10);
+                addToFileMD(502);
+
+                let dataleft=fileBuffer.length-fileMetaData[0];
+                let bigBlocks=Math.floor(dataleft/512);
+                for (let i=0;i<bigBlocks;i++) {
+                    addToFileMD(512);
+                }
+
+                dataleft=fileBuffer.length-fileMetaData[0];
+                console.log("Left Over:"+dataleft);
+                // really?? drop the left over but add it to size ??
+                fileBuffer = new Uint8Array(fileBuffer.slice(0,fileMetaData[0]));
+                fileMetaData[0]+=(218+dataleft);
+                isSending=true;
+                k250.startSendFile();
+            } else {
+                //presumably, it's one of our files
+                //1st 4 bytes are length of metadata array
+                let u32bytes = e.target.result.slice(0,4); 
+                let metaSize = new Uint32Array(u32bytes)[0];
+                //next is meta
+                fileMetaData=new Uint32Array(e.target.result.slice(4,4+metaSize));
+                //then the rest is buffer data
+                fileBuffer=new Uint8Array(e.target.result.slice(4+metaSize));
+                //console.log(`The content of ${file.name} is ${textContent}`);
+                isSending=true;
+                k250.startSendFile();
+            }
         }
         reader.onerror = (e) => {
             const error = e.target.error;
@@ -244,6 +286,11 @@
         }
         //now start the read
         reader.readAsArrayBuffer(file);
+    }
+    function bigEndian(barray) {
+        console.log(barray);
+        let result = ( barray[3] | barray[2]<<8 | barray[1]<<16 | barray[0]<<24 );
+        return result;
     }
 </script>
 </body>
