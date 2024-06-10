@@ -2,50 +2,69 @@
 <html>
 <head>
    <title>K250 Interface</title>
+   <link rel="stylesheet" href="qlsstyle.css">
    <script src="k250.js"></script>
    <script src="packets.js"></script>
 </head>
 <body onLoad="initPage()">
-<div>K250 Interface</div>
+<div class="title">Q L S - W E B</div>
 
 <div id="notAvailable"> 
     <div>Serial Port Not Available</div>
-    <div>Explanation of requirements, (https, chrome, etc)</div>
+    <div>Explanation of requirements:
+        <ul>
+            <li><b>Chrome or Chrome-based browser:</b> They are the only ones supporting serial port at this time</li>
+            <li><b>HTTPS or this page saved to your computer:</b>  It's a chrome requirement</li>
+        </ul>
+    </div>
 </div>
 
-<div id="mainPanel" style="display: none;">
+<div id="mainPanel" class="mainpanel">
+    <div class="connectgroup">
+        <div class="btngroup">
+            <div class="kbutn" id="btnConnect" onclick="condiscon()">&nbsp;</div>
+            <div>CONNECT</div>
+        </div>
+    </div>
     <div>
-        <button id="btnConnect" onclick="condiscon()">Connect</button>
-    </div>
-    <div id="connected" style="display:none;">
-        <div>
-            <button id="btnLinkReset" onclick="doLinkResync()">Link Resync</button>
-        </div>
-        <div>
-            <button id="btnConfig" onclick="doGetConfig()">Get Config</button>
-            <span id="configInfo">.</span>
-        </div>
-        <div id="appMessage"> </div>
-        <div>
-            <button id="btnSaveD1" onclick="doSaveDigitizer()">Save Digitizer</button>
-        </div>
-        <div>
-            <div>
-                Load Digitizer <input type="file" id="k250File"/>
+        <div id="lcdPanel" class="lcd bloff">&nbsp;<br/>&nbsp;</div>
+        <div id="connected" style="display: none;">
+            <div style="display: flex;padding-top:1em;padding-bottom:1em;">
+                <div class="btngroup spaced">
+                    <div class="kbutn" onclick="doGetConfig()" id="btnConfig">&nbsp;</div>
+                    <div>GET<br/>CONFIG</div>
+                </div>
+                <div class="btngroup spaced">
+                    <div class="kbutn" onclick="doLinkResync()" id="btnResync">&nbsp;</div>
+                    <div>LINK<br/>RESYNC</div>
+                </div>                
+                <div class="btngroup spaced">
+                    <div class="kbutn" onclick="doSaveDigitizer()" id="btnSave">&nbsp;</div>
+                    <div>SAVE<br/>DIGITIZER</div>
+                </div>                
+                <div class="btngroup spaced">
+                    <div class="kbutn" id="btnLoad">
+                        <label for="k250File">&nbsp;</label>
+                    </div>
+                    <div>LOAD<br/>DIGITIZER</div>
+                </div>                
             </div>
-            <div><progress id="uploadprog" max="100" value="0" style="display: none;">%</progress></div>
-        </div>
-        
+            <div style="display:none;"><input type="file" id="k250File"/></div>
+            </div>        
+        </div>    
     </div>
 </div>
 
-<div style="padding-top: 2em;">
-    <div>QLS Files</div>
-    <div>These were saved from QLS 3.8 as digitizer files</div>
+
+<div style="padding-top: 4em;padding-left: 4em;">
+    <div style="font-size: 120%;">Sample Files</div>
+    <div>These were saved from QLS 3.8 as digitizer files and will upload only</div>
     <a href="qlsfiles/BELLS">BELLS</a> <br/>
     <a href="qlsfiles/HARMONICA">HARMONICA</a> <br/>
     <a href="qlsfiles/TomOhYeah">TomOhYeah</a> <br/>
     <a href="qlsfiles/Voices (Bahh)">Voices (Bahh)</a>
+    <div style="padding-top: 1em">This file will upload and download</div>
+    <a href="qlsfiles/digitizer.k250">digitizer.k250</a>
 </div>
 
 <script>
@@ -61,7 +80,7 @@
     function initPage() {
         if (k250.isSupported) {
             document.querySelector("#notAvailable").style.display="none";
-            document.querySelector("#mainPanel").style.display="block";
+            document.querySelector("#mainPanel").style.display="flex";
             k250.on("appmsg",appMsg);
             k250.on("errmsg",errMsg);
             const fileElement = document.querySelector("#k250File");
@@ -77,16 +96,26 @@
     }
 
     function doLinkResync() {
-        sleep(800).then(()=>{k250.linkResync()});
+        document.querySelector("#btnResync").className="kbutn ledon";
+        sleep(850).then(()=>{  
+            k250.linkResync(); 
+            document.querySelector("#btnResync").className="kbutn";    
+            document.querySelector("#btnConfig").className="kbutn";
+            document.querySelector("#btnSave").className="kbutn";
+            document.querySelector("#btnLoad").className="kbutn";
+        });
     }
 
     function doGetConfig() {
+        document.querySelector("#btnConfig").className="kbutn ledon";
         k250.getConfig();
     }
 
     function doSaveDigitizer() {
+        document.querySelector("#btnSave").className="kbutn ledon";
         isDownloading=true;
         fileSize = -1;
+        console.log("Saving..");
         k250.getFile(); //this will take parameters for different file types
     }
 
@@ -94,11 +123,15 @@
         //console.log(event.detail);
         switch (event.detail.type) {
             case 1: //Connected
-                document.querySelector("#btnConnect").innerHTML="Disconnect";
+                document.querySelector("#btnConnect").className="kbutn ledon";
+                document.querySelector("#lcdPanel").className="lcd blon";
                 document.querySelector("#connected").style.display="block";
+                document.querySelector("#lcdPanel").innerHTML=event.detail.data+"<br/>&nbsp;"
                 break;
             case 2: //Disconnected
-                document.querySelector("#btnConnect").innerHTML="Connect";
+                document.querySelector("#btnConnect").className="kbutn";
+                document.querySelector("#lcdPanel").className="lcd bloff";
+                document.querySelector("#lcdPanel").innerHTML="&nbsp;<br/>&nbsp;"
                 document.querySelector("#connected").style.display="none";
                 break;
             case 3: //packet data
@@ -107,12 +140,12 @@
                     if (fileSize==-1) {
                          fileSize = new DataView(event.detail.data.buffer).getInt32();
                          if (fileSize<1) {
-                            document.querySelector("#appMessage").innerHTML="No Data Available";
+                            document.querySelector("#lcdPanel").innerHTML="ERROR:<br/>No Data Available";
                             isDownloading=false;
                             //do something else??
                          } else {
                             //file size OK, prep for data RX
-                            document.querySelector("#appMessage").innerHTML="FileSize: "+fileSize;
+                            document.querySelector("#lcdPanel").innerHTML="FileSize: <br/>"+fileSize;
                             fileMetaData=[fileSize,0];
                             fileBuffer=new Uint8Array([]);
                             k250.getNextPacket();
@@ -123,13 +156,13 @@
                         //console.log("data len="+r.length);
                         addToFileBuffer(r);
                         if ((fileSize-fileBuffer.length)<512 ) { //why does it end before buffer==filesize??
-                            document.querySelector("#appMessage").innerHTML="FileSize: "+fileSize+" Buffer:"+fileBuffer.length+" done";
+                            document.querySelector("#lcdPanel").innerHTML="FileSize: "+fileSize+" <br/>Buffer:"+fileBuffer.length+" done";
                             // done!
                             isDownloading=false;
-                            download('digitizer.bin');
+                            download('digitizer.k250');
                             doLinkResync();
                         } else {
-                            document.querySelector("#appMessage").innerHTML="FileSize: "+fileSize+" Buffer:"+fileBuffer.length;
+                            document.querySelector("#lcdPanel").innerHTML="FileSize: "+fileSize+" <br/>Buffer:"+fileBuffer.length;
                             k250.getNextPacket();
                         }
                     } 
@@ -140,15 +173,13 @@
                     sendPacketNum=1;
                     sendPacketIndex=0;
 
-                    document.querySelector("#uploadprog").value=sendPacketNum;
-                    document.querySelector("#uploadprog").max=fileMetaData[1];
-                    document.querySelector("#uploadprog").style.display="block";
+                    document.querySelector("#lcdPanel").innerHTML="Sending Data:<br/>"+sendPacketNum+" of "+fileMetaData[1];
 
                     sendNextFilePacket();
                     //end of sending section
                 } else {
                     // not downloading or sending
-                    document.querySelector("#configInfo").innerHTML=k250.bufferToHex(event.detail.data);
+                    document.querySelector("#lcdPanel").innerHTML="Config:<br/>"+k250.bufferToHex(event.detail.data);
                     doLinkResync();
                 }
                 break;
@@ -156,8 +187,11 @@
                 // a packet was sent, ready for more
                 sendNextFilePacket();
                 break;
+            case 5:
+                // device disconnected
+                k250.disconnect();
             default: 
-                document.querySelector("#appMessage").innerHTML=event.detail.data;
+                document.querySelector("#lcdPanel").innerHTML=event.detail.data;
         }
     }
 
@@ -165,22 +199,20 @@
         if (sendPacketNum>fileMetaData[1]) {
             //done!
             isSending=false;
-            document.querySelector("#uploadprog").style.display="none";
             doLinkResync();
         } else {
             const xmitBytes = fileMetaData[sendPacketNum+1];
             let packetData=fileBuffer.buffer.slice(sendPacketIndex,sendPacketIndex+xmitBytes);
             sendPacketIndex+=xmitBytes;
+            document.querySelector("#lcdPanel").innerHTML="Sending Data:<br/>"+sendPacketNum+" of "+fileMetaData[1];
             sendPacketNum++;
-            document.querySelector("#uploadprog").value=sendPacketNum;
             k250.sendData(packetData);
         }
     }
 
     function errMsg(event) {
         console.error(event.detail);
-        document.querySelector("#btnConnect").innerHTML="Connect";
-        document.querySelector("#appMessage").innerHTML=event.detail.data;
+        document.querySelector("#lcdPanel").innerHTML=event.detail.data;
         k250.disconnect();
     }
     function sleep(ms) {
@@ -234,6 +266,8 @@
     function readFile(e) {
         const file = event.target.files[0];
         if (!file) return;
+
+        document.querySelector("#btnLoad").className="kbutn ledon";
 
         const reader = new FileReader();
         reader.onload = (e) => {

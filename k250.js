@@ -147,8 +147,9 @@ class K250Interface {
           this.inTextBuffer = "";
           const writer = this.port.writable.getWriter();
           const outdata = Uint8Array.from(data);
-          //console.log("TX:"+this.bufferToHex(outdata));
           writer.write(outdata).then(writer.releaseLock());
+        } else {
+          console.log("Port is not writable");
         }
       }
 
@@ -166,9 +167,13 @@ class K250Interface {
             this.inTextBuffer = "";
             this.sendSerial(outData);
           } catch (err) {
-            this.errMsg.data = "There was an error opening the serial port: "+err;
-            parent.dispatchEvent(this.errorEvent);
-            console.error("There was an error opening the serial port:", err);
+            if (err.message.includes("No port selected")) {
+              console.log("No port selected");
+            } else {
+              this.errMsg.data = "There was an error opening the serial port: "+err;
+              parent.dispatchEvent(this.errorEvent);
+              console.error("There was an error opening the serial port:", err);
+            }
           }      
     }
 
@@ -205,6 +210,9 @@ class K250Interface {
           } catch (error) {
             // if there's an error reading the port:
             console.log(error);
+            this.appMsg.type = 5;
+            this.appMsg.data = "Device<br/>Disconnect";
+            parent.dispatchEvent(this.appMsgEvent);          
           } finally {
             this.reader.releaseLock();
           }

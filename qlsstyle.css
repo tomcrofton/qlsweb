@@ -1,0 +1,95 @@
+
+@font-face {
+    font-family: PassionOneBlack;
+    src: url(./fonts/PassionOne-Bold.ttf);
+}
+
+@font-face {
+    font-family: LcdDots;
+    src: url(./fonts/REGISTER.TTF);
+}
+
+:root {
+    --charcoal:#333333;
+}
+
+body {
+    color: bisque;
+    background-color: var(--charcoal);
+    font-family: monospace;
+}
+
+.title {
+    font-family: PassionOneBlack;
+    font-size: xxx-large;
+    -webkit-text-stroke-width: 1px;
+    -webkit-text-stroke-color: bisque;
+    -webkit-text-fill-color: var(--charcoal);
+    -webkit-transform: scale(1,0.85);
+    text-align: center;
+}
+
+a {
+    color: lightblue;
+}
+
+.lcd {
+    font-family: LcdDots;
+    font-size: large;
+    color: var(--charcoal);
+    background-color: chartreuse;
+    padding: .5em;
+    width: 20em;
+}
+
+.bloff {
+    background-color: darkgreen;
+}
+.blon {
+    background-color: chartreuse;
+}
+
+.btngroup {
+    text-align: center;
+}
+.spaced {
+    width: 25%;
+}
+
+.kbutn {
+    width: 46px;
+    height: 46px;
+    background: url("./img/KButtonOff.png");
+    background-color: black;
+    background-size: cover;
+    margin: auto;
+}
+
+.ledon {
+    background: url("./img/KButtonOn.png");
+    background-color: black;
+    background-size: cover;
+}
+
+.kbutn:hover {
+    background: url("./img/KButtonOn.png");
+    background-color: black;
+    background-size: cover;
+}
+
+.mainpanel {
+    margin: 0 auto;
+    width: fit-content; 
+    display: none;
+    padding-top:1em;
+}
+
+label {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.connectgroup {
+    padding:2em;
+}
