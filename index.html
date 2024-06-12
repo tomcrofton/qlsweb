@@ -230,23 +230,11 @@
     }
 
     function download(filename)  {
-        //add meta data infront of fileBuffer
-        const fmd32 = new Uint32Array(fileMetaData);
-        const metaDataBytes = new Uint8Array(fmd32.buffer);
-        const metaLength=metaDataBytes.length;
-
-        //make a final byte array with length of metadata, metadata, filedata
-        const metaLengthBytes = new Uint8Array([
-          (metaLength & 0x000000ff),
-          (metaLength & 0x0000ff00) >> 8,
-          (metaLength & 0x00ff0000) >> 16,
-          (metaLength & 0xff000000) >> 24
-        ]);
         //combine all into one big byte array
-        let wholeFile = new Uint8Array(4+metaLength+fileBuffer.length);
-        wholeFile.set(metaLengthBytes);
-        wholeFile.set(metaDataBytes,4);
-        wholeFile.set(fileBuffer, 4+metaLength);
+        let wholeFile = new Uint8Array(fileBuffer.length+218);
+        wholeFile.set(fileBuffer.slice(0,22310));
+        //218 unknown byte padding
+        wholeFile.set(fileBuffer.slice(22310),22528);
 
         //create element and download
         const a = document.createElement('a');
