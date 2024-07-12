@@ -49,8 +49,27 @@
                     <div>LOAD<br/>DIGITIZER</div>
                 </div>                
             </div>
-            <div style="display:none;"><input type="file" id="k250File"/></div>
-            </div>        
+
+            <div style="display: flex;padding-top:1em;padding-bottom:1em;">
+                <div class="btngroup spaced">
+                    <div class="kbutn" onclick="doSelectBank(1)" id="btnBank1">&nbsp;</div>
+                    <div>BANK 1</div>
+                </div>
+                <div class="btngroup spaced">
+                    <div class="kbutn" onclick="doSelectBank(2)" id="btnBank2">&nbsp;</div>
+                    <div>BANK 2</div>
+                </div>                
+                <div class="btngroup spaced">
+                    <div class="kbutn" onclick="doSelectBank(3)" id="btnBank3">&nbsp;</div>
+                    <div>BANK 3</div>
+                </div>                
+                <div class="btngroup spaced">
+                    <div class="kbutn" onclick="doSelectBank(4)" id="btnBank4">&nbsp;</div>
+                    <div>BANK 4</div>
+                </div>                
+            </div>
+
+            <div style="display:none;"><input type="file" id="k250File"/></div>        
         </div>    
     </div>
 </div>
@@ -64,7 +83,8 @@
     <a href="qlsfiles/TomOhYeah">TomOhYeah</a> <br/>
     <a href="qlsfiles/Voices (Bahh)">Voices (Bahh)</a>
     <div style="padding-top: 1em">This file will upload and download</div>
-    <a href="qlsfiles/digitizer.k250">digitizer.k250</a>
+    <a href="qlsfiles/digitizer.k250">digitizer.k250</a> <br/>
+    <a href="qlsfiles/PAN PIPES">PAN PIPES</a>
 </div>
 
 <script>
@@ -76,22 +96,36 @@
     let fileMetaData = [0,0]; //[filesize, numberofpackets, packetsizes...]
     let sendPacketNum=0;
     let sendPacketIndex=0;
+    let selectedBank=1;
 
     function initPage() {
         if (k250.isSupported) {
             document.querySelector("#notAvailable").style.display="none";
             document.querySelector("#mainPanel").style.display="flex";
+            doSelectBank(1);
             k250.on("appmsg",appMsg);
             k250.on("errmsg",errMsg);
             const fileElement = document.querySelector("#k250File");
             fileElement.onchange = readFile;
         } 
     }
+
     function condiscon() {
         if (k250.isConnected) {
             k250.disconnect();
         } else {
             k250.connect();
+        }
+    }
+
+    function doSelectBank(bankNum) {
+        selectedBank=bankNum;
+        for (let i=1;i<5;i++) {
+            if (i==selectedBank) {
+                document.querySelector("#btnBank"+i).className="kbutn ledon";
+            } else {
+                document.querySelector("#btnBank"+i).className="kbutn";
+            }
         }
     }
 
@@ -102,7 +136,16 @@
             document.querySelector("#btnResync").className="kbutn";    
             document.querySelector("#btnConfig").className="kbutn";
             document.querySelector("#btnSave").className="kbutn";
-            document.querySelector("#btnLoad").className="kbutn";
+            document.querySelector("#btnLoad").className="kbutn";   
+            //reset all variables
+            isDownloading=false;
+            isSending=false;
+            fileBuffer=new Uint8Array([]);
+            fileSize=-1;
+            fileMetaData = [0,0]; 
+            sendPacketNum=0;
+            sendPacketIndex=0;
+            doSelectBank(1);            
         });
     }
 
@@ -116,7 +159,7 @@
         isDownloading=true;
         fileSize = -1;
         console.log("Saving..");
-        k250.getFile(); //this will take parameters for different file types
+        k250.getFile(selectedBank); 
     }
 
     function appMsg(event) {
@@ -159,7 +202,7 @@
                             document.querySelector("#lcdPanel").innerHTML="FileSize: "+fileSize+" <br/>Buffer:"+fileBuffer.length+" done";
                             // done!
                             isDownloading=false;
-                            download('digitizer.k250');
+                            download('digitizer'+selectedBank+'.k250');
                             doLinkResync();
                         } else {
                             document.querySelector("#lcdPanel").innerHTML="FileSize: "+fileSize+" <br/>Buffer:"+fileBuffer.length;
@@ -289,7 +332,7 @@
                 fileBuffer = new Uint8Array(fileBuffer.slice(0,fileMetaData[0]));
                 fileMetaData[0]+=(218+dataleft);
                 isSending=true;
-                k250.startSendFile();
+                k250.startSendFile(selectedBank);
             } else {
                 //presumably, it's one of our files
                 //1st 4 bytes are length of metadata array
@@ -301,7 +344,7 @@
                 fileBuffer=new Uint8Array(e.target.result.slice(4+metaSize));
                 //console.log(`The content of ${file.name} is ${textContent}`);
                 isSending=true;
-                k250.startSendFile();
+                k250.startSendFile(selectedBank);
             }
         }
         reader.onerror = (e) => {

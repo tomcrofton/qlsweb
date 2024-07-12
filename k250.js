@@ -116,15 +116,15 @@ class K250Interface {
       this.sendBegin();
     }
 
-    getFile() { //this will take parameters for different file types
+    getFile(bankNumber) { //this will take parameters for different file types
       this.expecting=3;  //OK, then send get file
-      this.outData=[0x00, 0x12, 0x00, 0x00]; //get DIGI1
+      this.outData=[0x00, 0x12, 0x00, (bankNumber-1)]; //get DIGI
       this.sendBegin();
     }
 
-    startSendFile() { //this will take parameters for different file types
+    startSendFile(bankNumber) { //this will take parameters for different file types
       this.expecting=3;
-      this.outData=[0x00, 0x13, 0x00, 0x00]; //set DIGI1
+      this.outData=[0x00, 0x13, 0x00, (bankNumber-1)]; //set DIGI
       this.sendBegin();
     }
 
