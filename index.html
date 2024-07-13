@@ -77,13 +77,10 @@
 
 <div style="padding-top: 4em;padding-left: 4em;">
     <div style="font-size: 120%;">Sample Files</div>
-    <div>These were saved from QLS 3.8 as digitizer files and will upload only</div>
     <a href="qlsfiles/BELLS">BELLS</a> <br/>
     <a href="qlsfiles/HARMONICA">HARMONICA</a> <br/>
     <a href="qlsfiles/TomOhYeah">TomOhYeah</a> <br/>
     <a href="qlsfiles/Voices (Bahh)">Voices (Bahh)</a>
-    <div style="padding-top: 1em">This file will upload and download</div>
-    <a href="qlsfiles/digitizer.k250">digitizer.k250</a> <br/>
     <a href="qlsfiles/PAN PIPES">PAN PIPES</a>
 </div>
 
@@ -163,7 +160,6 @@
     }
 
     function appMsg(event) {
-        //console.log(event.detail);
         switch (event.detail.type) {
             case 1: //Connected
                 document.querySelector("#btnConnect").className="kbutn ledon";
@@ -198,8 +194,10 @@
                         const r = event.detail.data;
                         //console.log("data len="+r.length);
                         addToFileBuffer(r);
-                        if ((fileSize-fileBuffer.length)<512 ) { //why does it end before buffer==filesize??
-                            document.querySelector("#lcdPanel").innerHTML="FileSize: "+fileSize+" <br/>Buffer:"+fileBuffer.length+" done";
+                        if ((fileSize-fileBuffer.length)<512 ) { 
+                            //ends before buffer==filesize because of the 218 byte block? 
+                            const bufferTotal=fileBuffer.length+218;
+                            document.querySelector("#lcdPanel").innerHTML="FileSize: "+fileSize+" <br/>Buffer:"+bufferTotal+" done";
                             // done!
                             isDownloading=false;
                             download('digitizer'+selectedBank+'.k250');
@@ -211,13 +209,9 @@
                     } 
                     //end of downloading section
                 } else if (isSending) {
-                    //expecting byte[0,0,0,0]
-                    //prep, then first packet
                     sendPacketNum=1;
                     sendPacketIndex=0;
-
                     document.querySelector("#lcdPanel").innerHTML="Sending Data:<br/>"+sendPacketNum+" of "+fileMetaData[1];
-
                     sendNextFilePacket();
                     //end of sending section
                 } else {
@@ -309,7 +303,7 @@
                 fileBuffer=new Uint8Array(inputFileBytes.length-218);
                 fileBuffer.set(inputFileBytes.slice(0,22310))
                 fileBuffer.set(inputFileBytes.slice(22528),22310)
-                fileMetaData=[0,0];
+                fileMetaData=[0,0]; //totalBytes,packetCount,packetSize1,2,3...
 
                 addToFileMD(512);
                 addToFileMD(10);
@@ -320,19 +314,24 @@
                 addToFileMD(10);
                 addToFileMD(502);
 
-                let dataleft=fileBuffer.length-fileMetaData[0];
+                let expectedFileSize = bigEndian(inputFileBytes.slice(2,6))-218;
+                let dataleft=expectedFileSize-fileMetaData[0];
                 let bigBlocks=Math.floor(dataleft/512);
                 for (let i=0;i<bigBlocks;i++) {
                     addToFileMD(512);
                 }
 
-                dataleft=fileBuffer.length-fileMetaData[0];
-                console.log("Left Over:"+dataleft);
-                // really?? drop the left over but add it to size ??
+                dataleft=expectedFileSize-fileMetaData[0];
+                if (dataleft>0) {
+                    addToFileMD(dataleft);
+                }
+
+                console.log("Expected Size:"+expectedFileSize);
+                console.log("Blocks: "+bigBlocks+" + "+dataleft);
+
                 fileBuffer = new Uint8Array(fileBuffer.slice(0,fileMetaData[0]));
-                fileMetaData[0]+=(218+dataleft);
                 isSending=true;
-                k250.startSendFile(selectedBank);
+                k250.startSendFile(selectedBank); 
             } else {
                 //presumably, it's one of our files
                 //1st 4 bytes are length of metadata array
@@ -355,7 +354,6 @@
         reader.readAsArrayBuffer(file);
     }
     function bigEndian(barray) {
-        console.log(barray);
         let result = ( barray[3] | barray[2]<<8 | barray[1]<<16 | barray[0]<<24 );
         return result;
     }
