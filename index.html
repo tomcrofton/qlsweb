@@ -127,14 +127,7 @@
         }
     }
 
-    function doLinkResync() {
-        document.querySelector("#btnResync").className="kbutn ledon";
-        sleep(850).then(()=>{  
-            k250.linkResync(); 
-            document.querySelector("#btnResync").className="kbutn";    
-            document.querySelector("#btnConfig").className="kbutn";
-            document.querySelector("#btnSave").className="kbutn";
-            document.querySelector("#btnLoad").className="kbutn";   
+    function clearGlobalVariables() {
             //reset all variables
             isDownloading=false;
             isSending=false;
@@ -143,6 +136,17 @@
             fileMetaData = [0,0]; 
             sendPacketNum=0;
             sendPacketIndex=0;
+    }
+
+    function doLinkResync() {
+        document.querySelector("#btnResync").className="kbutn ledon";
+        sleep(850).then(()=>{  
+            k250.linkResync(); 
+            document.querySelector("#btnResync").className="kbutn";    
+            document.querySelector("#btnConfig").className="kbutn";
+            document.querySelector("#btnSave").className="kbutn";
+            document.querySelector("#btnLoad").className="kbutn";   
+            clearGlobalVariables();
             doSelectBank(1);            
         });
     }
@@ -334,17 +338,10 @@
                 isSending=true;
                 k250.startSendFile(selectedBank); 
             } else {
-                //presumably, it's one of our files
-                //1st 4 bytes are length of metadata array
-                let u32bytes = e.target.result.slice(0,4); 
-                let metaSize = new Uint32Array(u32bytes)[0];
-                //next is meta
-                fileMetaData=new Uint32Array(e.target.result.slice(4,4+metaSize));
-                //then the rest is buffer data
-                fileBuffer=new Uint8Array(e.target.result.slice(4+metaSize));
-                //console.log(`The content of ${file.name} is ${textContent}`);
-                isSending=true;
-                k250.startSendFile(selectedBank);
+                document.querySelector("#btnLoad").className="kbutn";
+                clearGlobalVariables();
+                const displayFileName= (file.name.length > 30)? file.name.substring(0, 27) + "..." : file.name;
+                document.querySelector("#lcdPanel").innerHTML=displayFileName+"<br/>Is not a digitizer file";
             }
         }
         reader.onerror = (e) => {
