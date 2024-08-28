@@ -48,7 +48,7 @@ class K250Interface {
     handleData(data) {
       //console.log("expecting: "+this.expecting+" RX:"+data);
 
-      // cases 1-5 expect text ending with "<" keep building until we get it 
+      // cases 1-9 expect text ending with "<" keep building until we get it 
       if (this.expecting>0 && this.expecting<10) {
         const inText=new TextDecoder().decode(data);
         this.inTextBuffer += inText;
@@ -59,18 +59,18 @@ class K250Interface {
       }
 
       switch (this.expecting) {
-        case 1: //board info
+        case 1: //got board info
           // should do a comparison here for version
           this.appMsg.data = this.inTextBuffer;
           this.appMsg.type = 1;
           this.expecting = 0;
           parent.dispatchEvent(this.appMsgEvent);    
           break;
-        case 2: //OK< no further action
+        case 2: //OK< and take no further action
           this.expecting = 0;
           break;
-        case 3: //OK then send P+getConfigPacket
-          this.expecting = 4; // OK, then get packet
+        case 3: //OK then send getConfigPacket
+          this.expecting = 4; 
           let send = new Uint8Array(this.outData);
           this.createAndSendPacket(send);
           break;
@@ -83,6 +83,16 @@ class K250Interface {
         case 5: //OK, then ready for more
           this.appMsg.data = this.inTextBuffer;
           this.appMsg.type = 4;
+          parent.dispatchEvent(this.appMsgEvent);    
+          break;
+        case 6: //OK, then send acceptMidiFile
+          this.expecting = 7;  
+          let sendData = new Uint8Array(this.outData);
+          this.createAndSendPacket(sendData);
+          break;
+        case 7: //OK, then send one packet
+          this.appMsg.data = this.inTextBuffer;
+          this.appMsg.type = 3;
           parent.dispatchEvent(this.appMsgEvent);    
           break;
         case 10:  //this will be packet data
@@ -111,8 +121,14 @@ class K250Interface {
     }
 
     getConfig() {
-      this.expecting=3; //OK, then send get config
+      this.expecting=3; //OK, then send get packet
       this.outData=[0x00, 0x16, 0x00, 0x06];
+      this.sendBegin();
+    }
+
+    getMidi() {
+      this.expecting=3; //OK, then send get packet
+      this.outData=[0x00, 0x0E, 0x02, 0x00];
       this.sendBegin();
     }
 
@@ -125,6 +141,12 @@ class K250Interface {
     startSendFile(bankNumber) { //this will take parameters for different file types
       this.expecting=3;
       this.outData=[0x00, 0x13, 0x00, (bankNumber-1)]; //set DIGI
+      this.sendBegin();
+    }
+
+    startSendMidi() {
+      this.expecting=6;
+      this.outData=[0x00, 0x0F, 0x02, 0x00]; //set MIDI
       this.sendBegin();
     }
 

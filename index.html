@@ -25,31 +25,14 @@
             <div class="kbutn" id="btnConnect" onclick="condiscon()">&nbsp;</div>
             <div>CONNECT</div>
         </div>
+        <div id="divResync" class="btngroup" style="display: none; margin-top:3em;">
+            <div class="kbutn" onclick="doLinkResync()" id="btnResync">&nbsp;</div>
+            <div>LINK<br/>RESYNC</div>
+        </div>                
     </div>
-    <div>
+    <div class="maingroup">
         <div id="lcdPanel" class="lcd bloff">&nbsp;<br/>&nbsp;</div>
         <div id="connected" style="display: none;">
-            <div style="display: flex;padding-top:1em;padding-bottom:1em;">
-                <div class="btngroup spaced">
-                    <div class="kbutn" onclick="doGetConfig()" id="btnConfig">&nbsp;</div>
-                    <div>GET<br/>CONFIG</div>
-                </div>
-                <div class="btngroup spaced">
-                    <div class="kbutn" onclick="doLinkResync()" id="btnResync">&nbsp;</div>
-                    <div>LINK<br/>RESYNC</div>
-                </div>                
-                <div class="btngroup spaced">
-                    <div class="kbutn" onclick="doSaveDigitizer()" id="btnSave">&nbsp;</div>
-                    <div>SAVE<br/>DIGITIZER</div>
-                </div>                
-                <div class="btngroup spaced">
-                    <div class="kbutn" id="btnLoad">
-                        <label for="k250File">&nbsp;</label>
-                    </div>
-                    <div>LOAD<br/>DIGITIZER</div>
-                </div>                
-            </div>
-
             <div style="display: flex;padding-top:1em;padding-bottom:1em;">
                 <div class="btngroup spaced">
                     <div class="kbutn" onclick="doSelectBank(1)" id="btnBank1">&nbsp;</div>
@@ -66,6 +49,26 @@
                 <div class="btngroup spaced">
                     <div class="kbutn" onclick="doSelectBank(4)" id="btnBank4">&nbsp;</div>
                     <div>BANK 4</div>
+                </div>  
+            </div>
+            <div style="display: flex;padding-top:1em;padding-bottom:1em;">
+                <div class="btngroup spaced">
+                    <div class="kbutn" onclick="doGetConfig()" id="btnConfig">&nbsp;</div>
+                    <div>GET<br/>CONFIG</div>
+                </div>
+                <div class="btngroup spaced">
+                    <div class="kbutn" onclick="doSaveMidi()" id="btnSaveMidi">&nbsp;</div>
+                    <div>SAVE<br/>MIDI</div>
+                </div>     
+                <div class="btngroup spaced">
+                    <div class="kbutn" onclick="doSaveDigitizer()" id="btnSave">&nbsp;</div>
+                    <div>SAVE<br/>DIGITIZER</div>
+                </div>                  
+                <div class="btngroup spaced">
+                    <div class="kbutn" id="btnLoad">
+                        <label for="k250File">&nbsp;</label>
+                    </div>
+                    <div>LOAD<br/>QLS FILE</div>
                 </div>                
             </div>
 
@@ -75,14 +78,26 @@
 </div>
 
 
-<div style="padding-top: 4em;padding-left: 4em;">
-    <div style="font-size: 120%;">Sample Files</div>
-    <a href="qlsfiles/BELLS">BELLS</a> <br/>
-    <a href="qlsfiles/HARMONICA">HARMONICA</a> <br/>
-    <a href="qlsfiles/TomOhYeah">TomOhYeah</a> <br/>
-    <a href="qlsfiles/Voices (Bahh)">Voices (Bahh)</a> <br/>
-    <a href="qlsfiles/PAN PIPES">PAN PIPES</a> <br/>
-    <a href="qlsfiles/BIRDS">BIRDS</a>
+<div class="notesrow">
+    <div class="notescolumn">
+        <div style="font-size: 120%;">Digitizer Sample Files</div>
+        <a href="qlsfiles/BELLS">BELLS</a> <br/>
+        <a href="qlsfiles/HARMONICA">HARMONICA</a> <br/>
+        <a href="qlsfiles/TomOhYeah">TomOhYeah</a> <br/>
+        <a href="qlsfiles/Voices (Bahh)">Voices (Bahh)</a> <br/>
+        <a href="qlsfiles/PAN PIPES">PAN PIPES</a> <br/>
+        <a href="qlsfiles/BIRDS">BIRDS</a>
+    </div>
+    <div class="notescolumn">
+        <div style="font-size: 120%;">Midi Sample Files</div>
+        <a href="qlsfiles/MidiSetup1">MidiSetup1</a> <br/>
+        <a href="qlsfiles/MidiSetup2">MidiSetup2</a>
+    </div>
+    <div class="notescolumn">
+        <div style="font-size: 120%;">Notes</div>
+        Currently handles only digitizer or midi files<br/>
+        Requires the K250 Interface Adapter
+    </div>
 </div>
 
 <script>
@@ -95,6 +110,7 @@
     let sendPacketNum=0;
     let sendPacketIndex=0;
     let selectedBank=1;
+    let downloadFileType=0;
 
     function initPage() {
         if (k250.isSupported) {
@@ -130,6 +146,7 @@
     function clearGlobalVariables() {
             //reset all variables
             isDownloading=false;
+            downloadFileType=0;
             isSending=false;
             fileBuffer=new Uint8Array([]);
             fileSize=-1;
@@ -146,6 +163,7 @@
             document.querySelector("#btnConfig").className="kbutn";
             document.querySelector("#btnSave").className="kbutn";
             document.querySelector("#btnLoad").className="kbutn";   
+            document.querySelector("#btnSaveMidi").className="kbutn";   
             clearGlobalVariables();
             doSelectBank(1);            
         });
@@ -156,9 +174,19 @@
         k250.getConfig();
     }
 
+    function doSaveMidi() {
+        document.querySelector("#btnSaveMidi").className="kbutn ledon";
+        isDownloading=true;
+        downloadFileType=10;
+        fileSize = -1;
+        console.log("Saving Midi...");
+        k250.getMidi();
+    }
+
     function doSaveDigitizer() {
         document.querySelector("#btnSave").className="kbutn ledon";
         isDownloading=true;
+        downloadFileType=7;
         fileSize = -1;
         console.log("Saving..");
         k250.getFile(selectedBank); 
@@ -171,12 +199,14 @@
                 document.querySelector("#lcdPanel").className="lcd blon";
                 document.querySelector("#connected").style.display="block";
                 document.querySelector("#lcdPanel").innerHTML=event.detail.data+"<br/>&nbsp;"
+                document.querySelector("#divResync").style.display="block";
                 break;
             case 2: //Disconnected
                 document.querySelector("#btnConnect").className="kbutn";
                 document.querySelector("#lcdPanel").className="lcd bloff";
                 document.querySelector("#lcdPanel").innerHTML="&nbsp;<br/>&nbsp;"
                 document.querySelector("#connected").style.display="none";
+                document.querySelector("#divResync").style.display="none";
                 break;
             case 3: //packet data
                 if (isDownloading) {
@@ -201,11 +231,10 @@
                         addToFileBuffer(r);
                         if ((fileSize-fileBuffer.length)<512 ) { 
                             //ends before buffer==filesize because of the 218 byte block? 
-                            const bufferTotal=fileBuffer.length+218;
-                            document.querySelector("#lcdPanel").innerHTML="FileSize: "+fileSize+" <br/>Buffer:"+bufferTotal+" done";
+                            document.querySelector("#lcdPanel").innerHTML="FileSize: "+fileSize+" <br/> complete";
                             // done!
                             isDownloading=false;
-                            download('digitizer'+selectedBank+'.k250');
+                            download();
                             doLinkResync();
                         } else {
                             document.querySelector("#lcdPanel").innerHTML="FileSize: "+fileSize+" <br/>Buffer:"+fileBuffer.length;
@@ -232,6 +261,7 @@
             case 5:
                 // device disconnected
                 k250.disconnect();
+                break;
             default: 
                 document.querySelector("#lcdPanel").innerHTML=event.detail.data;
         }
@@ -271,18 +301,32 @@
         fileMetaData.push(buffer.length); //add packet length
     }
 
-    function download(filename)  {
-        //combine all into one big byte array
-        let wholeFile = new Uint8Array(fileBuffer.length+218);
-        wholeFile.set(fileBuffer.slice(0,22310));
-        //218 unknown byte padding
-        wholeFile.set(fileBuffer.slice(22310),22528);
-
+    function download()  {
+        let fileName="";
+        let wholeFile=null;
+        switch (downloadFileType) {
+            case 7:
+                wholeFile = new Uint8Array(fileBuffer.length+218);
+                wholeFile.set(fileBuffer.slice(0,22310));
+                //218 unknown byte padding
+                wholeFile.set(fileBuffer.slice(22310),22528);
+                fileName='digitizer'+selectedBank+'.k250';
+                break;
+            case 10:
+                wholeFile = new Uint8Array(fileBuffer.length);
+                wholeFile.set(fileBuffer.slice(0));
+                fileName='MidiSettings.k250';
+                break;
+            default:
+                console.log("Unknown file save");
+                return;
+                break;
+        }
         //create element and download
         const a = document.createElement('a');
         const file = new Blob([wholeFile], {type: 'application/octet-stream'});
         a.href = URL.createObjectURL(file);
-        a.download = filename;
+        a.download = fileName;
         a.click();
         URL.revokeObjectURL(a.href);
     }
@@ -303,54 +347,78 @@
         reader.onload = (e) => {
             // e.target points to the reader, e.target.result is ArrayBuffer
             let inputFileBytes = new Uint8Array(e.target.result.slice(0));
-            if (inputFileBytes[0]==0 && inputFileBytes[1]==7) {
-                console.log("Digitizer File Detected");
-                fileBuffer=new Uint8Array(inputFileBytes.length-218);
-                fileBuffer.set(inputFileBytes.slice(0,22310))
-                fileBuffer.set(inputFileBytes.slice(22528),22310)
-                fileMetaData=[0,0]; //totalBytes,packetCount,packetSize1,2,3...
+            let fileType = inputFileBytes[1];
+            if (inputFileBytes[0]!=0) fileType=0; //unknnown type
+            console.log("File Type is "+fileType);
 
-                addToFileMD(512);
-                addToFileMD(10);
-                for (let i=0;i<42;i++) {
-                    addToFileMD(512);
-                }
-                addToFileMD(284);
-                addToFileMD(10);
-                addToFileMD(502);
-
-                let expectedFileSize = bigEndian(inputFileBytes.slice(2,6))-218;
-                let dataleft=expectedFileSize-fileMetaData[0];
-                let bigBlocks=Math.floor(dataleft/512);
-                for (let i=0;i<bigBlocks;i++) {
-                    addToFileMD(512);
-                }
-
-                dataleft=expectedFileSize-fileMetaData[0];
-                if (dataleft>0) {
-                    addToFileMD(dataleft);
-                }
-
-                console.log("Expected Size:"+expectedFileSize);
-                console.log("Blocks: "+bigBlocks+" + "+dataleft);
-
-                fileBuffer = new Uint8Array(fileBuffer.slice(0,fileMetaData[0]));
-                isSending=true;
-                k250.startSendFile(selectedBank); 
-            } else {
-                document.querySelector("#btnLoad").className="kbutn";
-                clearGlobalVariables();
-                const displayFileName= (file.name.length > 30)? file.name.substring(0, 27) + "..." : file.name;
-                document.querySelector("#lcdPanel").innerHTML=displayFileName+"<br/>Is not a digitizer file";
+            switch (fileType) {
+                case 7: //digitizer file
+                    setupAndSendDigitzer(inputFileBytes);
+                    break;
+                case 10:
+                    setupAndSendMidi(inputFileBytes);
+                    break;
+                default:
+                    document.querySelector("#btnLoad").className="kbutn";
+                    clearGlobalVariables();
+                    const displayFileName= (file.name.length > 30)? file.name.substring(0, 27) + "..." : file.name;
+                    document.querySelector("#lcdPanel").innerHTML=displayFileName+"<br/>Is not a known file type";
+                    break;
             }
         }
         reader.onerror = (e) => {
             const error = e.target.error;
-            console.error(`Error occured while reading ${file.name}`, error);
+            console.error('Error occured while reading ${file.name}', error);
         }
         //now start the read
         reader.readAsArrayBuffer(file);
     }
+
+    function setupAndSendMidi(fileBytes) { //fileBytes should be Uint8Array of 512 bytes
+        console.log("Midi File Detected");
+        fileMetaData=[0,0]; //totalBytes,packetCount,packetSize1,2,3...
+        addToFileMD(512);
+        fileBuffer = new Uint8Array(fileBytes.slice(0,fileMetaData[0]));
+        isSending=true;
+        k250.startSendMidi(); 
+    }
+
+    function setupAndSendDigitzer(fileBytes) { //fileBytes should be Uint8Array
+        console.log("Digitizer File Detected");
+        fileBuffer=new Uint8Array(fileBytes.length-218);
+        fileBuffer.set(fileBytes.slice(0,22310));
+        fileBuffer.set(fileBytes.slice(22528),22310);
+        fileMetaData=[0,0]; //totalBytes,packetCount,packetSize1,2,3...
+
+        addToFileMD(512);
+        addToFileMD(10);
+        for (let i=0;i<42;i++) {
+            addToFileMD(512);
+        }
+        addToFileMD(284);
+        addToFileMD(10);
+        addToFileMD(502);
+
+        let expectedFileSize = bigEndian(fileBytes.slice(2,6))-218;
+        let dataleft=expectedFileSize-fileMetaData[0];
+        let bigBlocks=Math.floor(dataleft/512);
+        for (let i=0;i<bigBlocks;i++) {
+            addToFileMD(512);
+        }
+
+        dataleft=expectedFileSize-fileMetaData[0];
+        if (dataleft>0) {
+            addToFileMD(dataleft);
+        }
+
+        console.log("Expected Size:"+expectedFileSize);
+        console.log("Blocks: "+bigBlocks+" + "+dataleft);
+
+        fileBuffer = new Uint8Array(fileBuffer.slice(0,fileMetaData[0]));
+        isSending=true;
+        k250.startSendFile(selectedBank); 
+    }
+
     function bigEndian(barray) {
         let result = ( barray[3] | barray[2]<<8 | barray[1]<<16 | barray[0]<<24 );
         return result;

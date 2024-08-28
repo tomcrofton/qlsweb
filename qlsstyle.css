@@ -11,11 +11,12 @@
 
 :root {
     --charcoal:#333333;
+    --basecolor: #252525;
 }
 
 body {
     color: bisque;
-    background-color: var(--charcoal);
+    background-color: var(--basecolor);
     font-family: monospace;
 }
 
@@ -62,7 +63,7 @@ a {
     background: url("./img/KButtonOff.png");
     background-color: black;
     background-size: cover;
-    margin: auto;
+    margin: auto auto 4px auto;
 }
 
 .ledon {
@@ -91,5 +92,31 @@ label {
 }
 
 .connectgroup {
+    border-radius: 1em;
+    background-color: var(--charcoal);
+    margin-right: 1em;
     padding:2em;
+    height: fit-content;
+}
+
+.maingroup {
+    border-radius: 1em;
+    background-color: var(--charcoal);
+    margin: 1em;
+    padding: 2em;
+}
+
+.notescolumn {
+    float: left;
+    width: 33.33%;
+}
+
+.notesrow {
+    padding: 4em;
+}
+
+.notesrow:after {
+    content: "";
+    display: table;
+    clear: both;
 }
