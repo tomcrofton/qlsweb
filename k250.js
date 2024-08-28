@@ -121,8 +121,14 @@ class K250Interface {
     }
 
     getConfig() {
-      this.expecting=3; //OK, then send get config
+      this.expecting=3; //OK, then send get packet
       this.outData=[0x00, 0x16, 0x00, 0x06];
+      this.sendBegin();
+    }
+
+    getMidi() {
+      this.expecting=3; //OK, then send get packet
+      this.outData=[0x00, 0x0E, 0x02, 0x00];
       this.sendBegin();
     }
 
