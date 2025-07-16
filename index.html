@@ -367,6 +367,9 @@
                 case 10:
                     setupAndSendMidi(inputFileBytes);
                     break;
+                case 11: //snd file
+                    setupAndSendSndFile(inputFileBytes);
+                    break;
                 default:
                     document.querySelector("#btnLoad").className="kbutn";
                     clearGlobalVariables();
@@ -390,6 +393,28 @@
         fileBuffer = new Uint8Array(fileBytes.slice(0,fileMetaData[0]));
         isSending=true;
         k250.startSendMidi(); 
+    }
+
+    function setupAndSendSndFile(fileBytes) { //fileBytes should be Uint8Array of 512 bytes
+        console.log("Sound File Detected");
+        fileMetaData=[0,0]; //totalBytes,packetCount,packetSize1,2,3...
+
+        let bigBlocks=Math.floor(fileBytes.length/512);
+        for (let i=0;i<bigBlocks;i++) {
+            addToFileMD(512);
+        }
+
+        dataleft=fileBytes.length-fileMetaData[0];
+        if (dataleft>0) {
+            addToFileMD(dataleft);
+        }
+
+        console.log("Size:"+fileBytes.length);
+        console.log("Blocks: "+bigBlocks+" + "+dataleft);
+
+        fileBuffer = new Uint8Array(fileBytes.slice(0,fileMetaData[0]));
+        isSending=true;
+        k250.startSendFile(selectedBank,'snd'); 
     }
 
     function setupAndSendDigitzer(fileBytes) { //fileBytes should be Uint8Array
@@ -425,7 +450,7 @@
 
         fileBuffer = new Uint8Array(fileBuffer.slice(0,fileMetaData[0]));
         isSending=true;
-        k250.startSendFile(selectedBank); 
+        k250.startSendFile(selectedBank,'digi'); 
     }
 
     function bigEndian(barray) {
