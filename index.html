@@ -94,7 +94,9 @@
         <a href="qlsfiles/MidiSetup2">MidiSetup2</a><br/>
         <br/>
         <div style="font-size: 120%;">Soundfile Archive</div>
-        <a href="http://mphtower.net/Synths/KurzweilK250/OtherK250Resources/K250%20Sounds/" target="_blank">Hightower Archive &#x2197;</a>
+        <a href="http://mphtower.net/Synths/KurzweilK250/OtherK250Resources/K250%20Sounds/" target="_blank">Hightower Archive &#x2197;</a><br/>
+        <br/>Not all files are digitizer files, and some files do not work.<br/>
+
     </div>
     <div class="notescolumn">
         <div style="font-size: 120%;">Notes</div>
@@ -102,7 +104,7 @@
         Requires the K250 Interface Adapter<br/>
         <br/>
         <div style="font-size: 120%;">Firmware</div>
-        You pico already has this version, there have <br/>
+        Your pico already has this version, there have <br/>
         not been any updates <br/>
         <a href="fw/k250interface.uf2">k250interface.uf2</a>
 
@@ -120,6 +122,7 @@
     let sendPacketIndex=0;
     let selectedBank=1;
     let downloadFileType=0;
+    let sndFileSpecialCase=false;
 
     function initPage() {
         if (k250.isSupported) {
@@ -162,6 +165,7 @@
             fileMetaData = [0,0]; 
             sendPacketNum=0;
             sendPacketIndex=0;
+            sndFileSpecialCase=false;
     }
 
     function doLinkResync() {
@@ -282,6 +286,16 @@
             isSending=false;
             doLinkResync();
         } else {
+
+
+            if (sendPacketNum==2 && sndFileSpecialCase) {
+                console.log("Special Case when sending snd file to look for that extra pkt");
+                sndFileSpecialCase=false;//because we're handling it here
+                k250.getNextPacketAndIgnore();
+                return; 
+            }
+
+
             const xmitBytes = fileMetaData[sendPacketNum+1];
             let packetData=fileBuffer.buffer.slice(sendPacketIndex,sendPacketIndex+xmitBytes);
             sendPacketIndex+=xmitBytes;
@@ -414,6 +428,7 @@
 
         fileBuffer = new Uint8Array(fileBytes.slice(0,fileMetaData[0]));
         isSending=true;
+        sndFileSpecialCase=true; //need this for getting the extra 4 byte packet
         k250.startSendFile(selectedBank,'snd'); 
     }
 

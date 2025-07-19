@@ -108,7 +108,8 @@ label {
 
 .notescolumn {
     float: left;
-    width: 33.33%;
+    width: 30%;
+    padding-left: 2em;
 }
 
 .notesrow {

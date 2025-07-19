@@ -108,6 +108,14 @@ class K250Interface {
             parent.dispatchEvent(this.appMsgEvent);    
           }
           break;
+        case 11: //only used when sending snd file
+          this.packets.addToBuffer(data);
+          if (this.packets.packetComplete()) {
+            this.appMsg.data = this.packets.getPacketData(); // decode data here
+            this.appMsg.type = 4;
+            parent.dispatchEvent(this.appMsgEvent);    
+          }
+          break;
         default:
           this.appMsg.data = "RX: "+inText;
           this.appMsg.type = 0;
@@ -180,7 +188,14 @@ class K250Interface {
       this.expecting = 10; //binary data
       this.sendSerial(outData);
     }
-  
+
+    getNextPacketAndIgnore() {
+      const outData = new Uint8Array([71]); //G
+      this.packets.clearBuffer();
+      this.expecting = 11; //4 byte pkt for snd file
+      this.sendSerial(outData);
+    }
+    
     async sendSerial(data) {
         if (!this.port) return;
         if (this.port.writable) {
