@@ -382,7 +382,13 @@
                     setupAndSendMidi(inputFileBytes);
                     break;
                 case 11: //snd file
-                    setupAndSendSndFile(inputFileBytes);
+                    // Build the manifest, but need to pass the file along to extract the name
+                    // To send a sound file, you need to send a manifest with the filename
+                    // and other parameters, then receive a 4-byte return code packet
+                    // If the packet is all 0x00, then the first 512 bytes of the snd file
+                    // are sent, after which you receive another 4-byte return code packet
+                    // If the second code is all 0x00, then it's ok to send the rest of the file
+                    setupAndSendSoundfile(file, inputFileBytes);
                     break;
                 default:
                     document.querySelector("#btnLoad").className="kbutn";
@@ -408,7 +414,7 @@
         isSending=true;
         k250.startSendMidi(); 
     }
-
+    /*
     function setupAndSendSndFile(fileBytes) { //fileBytes should be Uint8Array of 512 bytes
         console.log("Sound File Detected");
         fileMetaData=[0,0]; //totalBytes,packetCount,packetSize1,2,3...
@@ -430,6 +436,119 @@
         isSending=true;
         sndFileSpecialCase=true; //need this for getting the extra 4 byte packet
         k250.startSendFile(selectedBank,'snd'); 
+    }
+    */
+    function setupAndSendSoundfile(file, fileBytes) {
+        console.log("QLS Sound File (.qls) Detected");
+
+        // --- 1. Parse the header to get the segment count and possibly the header block count ---
+        if (fileBytes.byteLength < 18) {
+            alert("Error: This does not appear to be a valid QLS file");
+            document.querySelector("#btnLoad").className = "kbutn";
+            return;
+        }
+        
+        // Need to pull the envelope segment count from the buffer in advance
+        const view = new DataView(fileBytes.buffer);
+        
+        // Read 16-bit big-endian value at offset 16
+        const num_segs_from_header = view.getInt16(16, false);
+        
+        // Apply the special business rule for segment count
+        // From the QLS source code:
+        // "If no segments, numsegs = 1 (strange, but true)."
+        // The issue is that an error is returned if the snd file
+        // has no segments and you pass "01", which means that if
+        // the number of segments is 01, then make it 00
+        let manifest_segment_count = 0;
+        
+        if (num_segs_from_header === 1) {
+            manifest_segment_count = 0;
+        } else {
+            manifest_segment_count = num_segs_from_header & 0xFF; // Treat as unsigned char
+        }
+        console.log(`Parsed num_segs: ${num_segs_from_header}, Manifest count: ${manifest_segment_count}`);
+
+        // TO DO: The number of header blocks can the 01 or 02 - a snd file with up to 75 segments
+        // can fit in one block, but a sound with 76 - 160 envelope segments needs a second block
+        // It is currently not known if a) the number of blocks is required as part of the manifest, and
+        // b) if the second 512-byte header containing the blocks needs to be send separate from the
+        // sample data. Testing with a snd file with > 75 blocks would help
+        // Uncomment the following and assign the number of header blocks as appropriate (TBD)
+        // let manifest_header_block_count = 0;
+        // // Read 16-bit big-endian value at offset 32
+        // const num_blks_from_header = view.getInt16(32, false);
+        // manifest_header_block_count = num_blks_from_header & 0xFF; // Treat as unsigned char
+        // Byte ??: Header Block count
+        // manifestPayload[??] = manifest_header_block_count;
+        
+        // --- 2. Build the 26-byte manifest payload ---
+        const manifestPayload = new Uint8Array(26).fill(0); // Create a 26-byte array filled with zeros
+
+        // Bytes 0-1: Command code
+        manifestPayload[0] = 0x00;
+        manifestPayload[1] = 0x15;
+
+        // Bytes 2-17: Filename (16 bytes, zero-padded)
+        // TO DO: Some filenames are't exactly compatible with the K250's limited character set
+        // Need to escape any characters in the filename outside of the "old" ASCII range
+        const encoder = new TextEncoder();
+        const encodedName = encoder.encode(file.name);
+        manifestPayload.set(encodedName.slice(0, 16), 2); // thankfully, set() handles truncation and copying
+        // Since the manifest was initialized to 0x00, no padding is needed
+        
+        // Byte 18: Segment count
+        // It's assumed - but not proven - that this is where the segment count is places
+        // Need to capture a multi-segment file to be certain
+        manifestPayload[18] = manifest_segment_count;
+        
+        // Byte 19: Special bank rule
+        // From Tom's testing, if all that changed was the Bank, this byte changed as well
+        // C code equivalent: file_info_payload[19] = (unsigned char)(bank_number) + ((unsigned char)(bank_number) < 1 ? 0 : 1);
+        if (selectedBank < 1) {
+            manifestPayload[19] = selectedBank; // Will be 0 if bankNumber is 0
+         } else {
+             manifestPayload[19] = selectedBank + 1;
+         }
+        
+        // Byte 20: Unknown
+        manifestPayload[20] = 0x00;
+        
+        // Bytes 21-23: Hardcoded values
+        // Again, capturing conversation bytes from different files may shed some light on these values
+        manifestPayload[21] = 0x07;
+        manifestPayload[22] = 0x40;
+        manifestPayload[23] = 0xE2;
+
+        // Byte 24: Unknown
+        manifestPayload[24] = 0x00;
+        
+        // Byte 25: Bank number (0-indexed)
+        manifestPayload[25] = selectedBank - 1;
+
+        // Dump the manifest to the log
+        console.log("Generated Manifest Payload:", k250.bufferToHex(manifestPayload));
+
+        // --- 3. Prepare file data and packet metadata for transfer ---
+        // 100% copied from Tom's function
+        fileMetaData = [0, 0]; // Reset metadata - totalBytes,packetCount,packetSize1,2,3...
+        
+        let bigBlocks = Math.floor(fileBytes.length / 512);
+        for (let i = 0; i < bigBlocks; i++) {
+            addToFileMD(512);
+        }
+
+        let dataleft = fileBytes.length - fileMetaData[0];
+        if (dataleft > 0) {
+            addToFileMD(dataleft);
+        }
+        
+        fileBuffer = fileBytes; // The whole file
+        isSending = true;
+        sndFileSpecialCase = true; //need this for getting the extra 4 byte packet
+
+        // --- 4. Initiate the transfer with the DYNAMIC payload ---
+        k250.startSendFile(selectedBank, 'snd', manifestPayload);
     }
 
     function setupAndSendDigitzer(fileBytes) { //fileBytes should be Uint8Array

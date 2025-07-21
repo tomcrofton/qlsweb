@@ -147,27 +147,32 @@ class K250Interface {
       this.sendBegin();
     }
 
-    startSendFile(bankNumber,fileType) { //this will take parameters for different file types
+    startSendFile(bankNumber, fileType, manifestPayload = null) { //this will take parameters for different file types
+        if (this.FILE_TYPES.indexOf(fileType) === -1) {
+            this.errMsg.data = "File type " + fileType + " not supported";
+            parent.dispatchEvent(this.errorEvent);
+            console.error("File type " + fileType + " not supported");
+            return;
+        }
 
-      if (this.FILE_TYPES.indexOf(fileType) === -1) {
-        this.errMsg.data = "File type "+fileType+" not supported";
-        parent.dispatchEvent(this.errorEvent);
-        console.error("File type "+fileType+" not supported");
-        return;
-      }
-
-      this.expecting=3;
-      if (fileType === 'digi') {
-        this.outData=[0x00, 0x13, 0x00, (bankNumber-1)]; //set DIGI
-      }
-      if (fileType === 'snd') {
-        //TODO: we have to build this from the file name etc.
-        this.outData=[0x00, 0x15, 
-          0x53, 0x55, 0x52, 0x46, 0x5F, 0x73, 0x6E, 0x64, 0x66, 0x69, 0x6C, 0x65, 
-          0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x07, 0x40, 0xe2,
-          0x00, (bankNumber-1)]; //set SND
-      }
-      this.sendBegin();
+        this.expecting = 3;
+        if (fileType === 'digi') { // Digitizer just needs code 0x13 and the selected Bank
+            this.outData = [0x00, 0x13, 0x00, (bankNumber - 1)]; //set DIGI
+        } else if (fileType === 'snd') {
+            // If a manifest payload is provided, use it. Otherwise, fall back to assuming the SURF file is being tested
+            if (manifestPayload) {
+                this.outData = manifestPayload;
+            } else {
+                // This is the original hardcoded fallback
+                console.warn("Using hardcoded manifest for snd file. Please update calling function.");
+                this.outData = [0x00, 0x15,
+                    0x53, 0x55, 0x52, 0x46, 0x5F, 0x73, 0x6E, 0x64, 0x66, 0x69, 0x6C, 0x65,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x07, 0x40, 0xe2,
+                    0x00, (bankNumber - 1)
+                ]; //set SND
+            }
+        }
+        this.sendBegin();
     }
 
     startSendMidi() {
