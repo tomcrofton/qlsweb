@@ -23,6 +23,7 @@ class K250Interface {
         this.expecting = 0;
         this.inTextBuffer;
         this.outData=[];
+        this.FILE_TYPES = ['digi', 'snd'];
 
         //define events
         this.errMsg = { data: null };
@@ -46,7 +47,7 @@ class K250Interface {
     }
 
     handleData(data) {
-      //console.log("expecting: "+this.expecting+" RX:"+data);
+      console.log("expecting: "+this.expecting+" RX:"+data);
 
       // cases 1-9 expect text ending with "<" keep building until we get it 
       if (this.expecting>0 && this.expecting<10) {
@@ -107,6 +108,14 @@ class K250Interface {
             parent.dispatchEvent(this.appMsgEvent);    
           }
           break;
+        case 11: //only used when sending snd file
+          this.packets.addToBuffer(data);
+          if (this.packets.packetComplete()) {
+            this.appMsg.data = this.packets.getPacketData(); // decode data here
+            this.appMsg.type = 4;
+            parent.dispatchEvent(this.appMsgEvent);    
+          }
+          break;
         default:
           this.appMsg.data = "RX: "+inText;
           this.appMsg.type = 0;
@@ -138,10 +147,32 @@ class K250Interface {
       this.sendBegin();
     }
 
-    startSendFile(bankNumber) { //this will take parameters for different file types
-      this.expecting=3;
-      this.outData=[0x00, 0x13, 0x00, (bankNumber-1)]; //set DIGI
-      this.sendBegin();
+    startSendFile(bankNumber, fileType, manifestPayload = null) { //this will take parameters for different file types
+        if (this.FILE_TYPES.indexOf(fileType) === -1) {
+            this.errMsg.data = "File type " + fileType + " not supported";
+            parent.dispatchEvent(this.errorEvent);
+            console.error("File type " + fileType + " not supported");
+            return;
+        }
+
+        this.expecting = 3;
+        if (fileType === 'digi') { // Digitizer just needs code 0x13 and the selected Bank
+            this.outData = [0x00, 0x13, 0x00, (bankNumber - 1)]; //set DIGI
+        } else if (fileType === 'snd') {
+            // If a manifest payload is provided, use it. Otherwise, fall back to assuming the SURF file is being tested
+            if (manifestPayload) {
+                this.outData = manifestPayload;
+            } else {
+                // This is the original hardcoded fallback
+                console.warn("Using hardcoded manifest for snd file. Please update calling function.");
+                this.outData = [0x00, 0x15,
+                    0x53, 0x55, 0x52, 0x46, 0x5F, 0x73, 0x6E, 0x64, 0x66, 0x69, 0x6C, 0x65,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x07, 0x40, 0xe2,
+                    0x00, (bankNumber - 1)
+                ]; //set SND
+            }
+        }
+        this.sendBegin();
     }
 
     startSendMidi() {
@@ -162,7 +193,14 @@ class K250Interface {
       this.expecting = 10; //binary data
       this.sendSerial(outData);
     }
-  
+
+    getNextPacketAndIgnore() {
+      const outData = new Uint8Array([71]); //G
+      this.packets.clearBuffer();
+      this.expecting = 11; //4 byte pkt for snd file
+      this.sendSerial(outData);
+    }
+    
     async sendSerial(data) {
         if (!this.port) return;
         if (this.port.writable) {
@@ -259,6 +297,11 @@ class K250Interface {
     let outdata=new Uint8Array([80]);//P
     this.sendSerial(outdata);
     let rawpacket=this.packets.buildPacket(pktData);
+    if (rawpacket.length > 40) {
+      console.log("Send long packet of length: "+rawpacket.length);
+    } else {
+      console.log("Send packet: "+this.bufferToHex(rawpacket));
+    }
     this.sendSerial(rawpacket);
   }
 
